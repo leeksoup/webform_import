@@ -154,7 +154,7 @@ function webform_import_form($node, $form_state) {
       continue;
     }
     $style = '';
-    if ($component['mandatory']) {
+    if (array_key_exists('mandatory', $component)) {
       $style = 'font-weight: bold';
     }
     $component_table['rows'][] = array(
