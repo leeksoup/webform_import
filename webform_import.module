@@ -81,7 +81,7 @@ function webform_import_menu() {
  */
 function webform_import_csvtemplate($node, $type) {
   $types = _webform_import_field_key_options();
-  $filename = check_plain($node->title) . '_upload.csv';
+  $filename = str_replace(' ', '_', check_plain($node->title)) . '_upload.csv';
   $headers = array();
   $node->webform['components']['-1'] = array(
     'name' => 'Submission ID',
