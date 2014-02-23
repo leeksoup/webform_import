@@ -55,8 +55,7 @@ function webform_import_menu() {
     'title' => 'Upload',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('webform_import_form', 1),
-    'access callback' => 'node_access',
-    'access arguments' => array('update', 1),
+    'access arguments' => array('access webform upload'),
     'weight' => 10,
     'type' => MENU_LOCAL_TASK,
   );
@@ -64,11 +63,22 @@ function webform_import_menu() {
     'title' => 'Get Template',
     'page callback' => 'webform_import_csvtemplate',
     'page arguments' => array(1, 4),
-    'access callback' => 'node_access',
-    'access arguments' => array('update', 1),
+    'access arguments' => array('access webform upload'),
     'type' => MENU_CALLBACK,
   );
   return $items;
+}
+
+/**
+ * Implements hook_perm().
+ */
+function webform_import_permission() {
+  return array(
+    'access webform upload' => array(
+      'title' => t('Access Webform Upload'),
+      'description' => t('Grants access to the "Upload" tab on all webform content.Be cautious while enabling this privilege.'),
+    ),
+  );
 }
 
 /**
