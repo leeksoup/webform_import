@@ -405,7 +405,10 @@ function _webform_import_import($form, $form_state, $file) {
           $type = $keys[$fields[$k]]['type'];
           // Date and time components.
           if ($type === 'date' || $type === 'time') {
-            if ($time = strtotime($v)) {
+            $timezone = date_default_timezone();
+            $date = new DateTime($v, new DateTimeZone($timezone));
+            $timestamp = $dtime->format('U');
+            if ($time = $timestamp) {
               $v = $type === 'date' ? date('Y-m-d', $time) : date('H:i:s', $time);
             }
             else {
