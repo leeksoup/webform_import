@@ -175,8 +175,8 @@ function webform_import_form($node, $form_state) {
   }
   // Add Submission Date - will be used if present in the file
   $component_table['rows'][] = array(
-      array( 'data' => 'submitted_time', 'style' => $style ),
-      array( 'data' => 'submitted_time', 'style' => $style ),
+      array( 'data' => 'Submission DateTime', 'style' => $style ),
+      array( 'data' => 'submitted_datetime', 'style' => $style ),
   );
 
   $form['header'] = array(
@@ -347,7 +347,7 @@ function _webform_import_import($form, $form_state, $file) {
       foreach ($data as $k => &$v) {
         $v = _webform_import_csvfieldtrim($v);
         // Identify the Key of Submitted Time
-        if($v == 'Submitted Time' || $v == 'submitted_time'){
+        if($v == 'Submission DateTime' || $v == 'submitted_datetime'){
           $submitted_key = $k;
           continue;
         }
