@@ -407,7 +407,7 @@ function _webform_import_import($form, $form_state, $file) {
           if ($type === 'date' || $type === 'time') {
             $timezone = date_default_timezone();
             $date = new DateTime($v, new DateTimeZone($timezone));
-            $timestamp = $dtime->format('U');
+            $timestamp = $date->format('U');
             if ($time = $timestamp) {
               $v = $type === 'date' ? date('Y-m-d', $time) : date('H:i:s', $time);
             }
