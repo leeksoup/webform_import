@@ -231,7 +231,7 @@ function webform_import_form($node, $form_state) {
   $form['delimiter'] = array(
     '#type' => 'select',
     '#title' => t('File Delimiter'),
-    '#default_value' => '\t',
+    '#default_value' => "\t",
     '#options' => _webform_import_delimiter_options(),
     '#description' => t('Delimiter for file being uploaded.'),
   );
@@ -317,7 +317,7 @@ function _webform_import_import($form, $form_state, $file) {
 
   $webform = node_load(intval($form_state['values']['nid']));
   $delimiter = $form_state['values']['delimiter'];
-  $delimiter = $delimiter == '\t' ? '\t' : $delimiter;
+  $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
   $keys = array();
@@ -468,7 +468,7 @@ function _webform_import_import($form, $form_state, $file) {
 function _webform_import_delimiter_options() {
   return array(
     ',' => t('Comma (,)'),
-    '\t' => t('Tab (\t)'),
+    "\t" => t('Tab (\t)'),
     ';' => t('Semicolon (;)'),
     ':' => t('Colon (:)'),
     '|' => t('Pipe (|)'),
