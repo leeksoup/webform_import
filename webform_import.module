@@ -165,7 +165,7 @@ function webform_import_form($node, $form_state) {
       continue;
     }
     $style = '';
-    if (isset($component['mandatory'])) {
+    if (isset($component['required'])) {
       $style = 'font-weight: bold';
     }
     $component_table['rows'][] = array(
@@ -362,7 +362,7 @@ function _webform_import_import($form, $form_state, $file) {
 
       foreach ($keys as $k => $component) {
         if (!strcmp($k, 'name')) {
-          if ($component['mandatory'] && !isset($fields[$k])) {
+          if ($component['required'] && !isset($fields[$k])) {
             form_set_error('upload', t('Column @k is required but could not be found in this file. Alter the file or the webform and try again.', array('@k' => $k)));
           }
         }
@@ -381,7 +381,7 @@ function _webform_import_import($form, $form_state, $file) {
         $v = _webform_import_csvfieldtrim($v);
         if ($v == '') {
           // Checking mandatory field for a value.
-          if (array_key_exists('mandatory',$keys[$fields[$k]]) && $keys[$fields[$k]]['mandatory']) {
+          if (array_key_exists('required',$keys[$fields[$k]]) && $keys[$fields[$k]]['required']) {
             drupal_set_message(t('Required field has no value at row,col: @r,@c.  Skipping this row!', array('@r' => $c, '@c' => $k)), 'warning');
             continue 2;
           }
