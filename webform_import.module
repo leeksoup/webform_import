@@ -104,7 +104,6 @@ function webform_import_csvtemplate($node, $type) {
  */
 function webform_import_form($node, $form_state) {
   $node = $form_state['build_info']['args'][0];
-  global $user;
 
   // Add a css class for all client forms.
   $form['#attributes'] = array('class' => 'webform-import-form');
@@ -148,8 +147,8 @@ function webform_import_form($node, $form_state) {
   }
   // Add Submission Date - will be used if present in the file
   $component_table['rows'][] = array(
-    array('data' => 'Submission DateTime', 'style' => $style ),
-    array('data' => 'submitted_datetime', 'style' => $style ),
+    array('data' => 'Submitted Time', 'style' => $style ),
+    array('data' => 'submitted_time', 'style' => $style ),
   );
 
   $form['header'] = array(
@@ -279,7 +278,6 @@ function webform_import_form_submit($form, $form_state) {
  * @see webform_import_form()
  */
 function _webform_import_import($form, $form_state, $file) {
-  global $user;
 
   // This makes php auto-detect mac line endings.
   ini_set('auto_detect_line_endings', TRUE);
@@ -301,21 +299,25 @@ function _webform_import_import($form, $form_state, $file) {
   $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
-  $keys = array();
-  $keys[$field_key === 'name' ? 'Submission ID' : 'SID'] = array( 'form_key' => 'SID');
+  $components_list = array();
+  if ($field_key === 'name') {
+    $components_list['Submission ID'] = array('form_key' => 'SID');
+  }
+  else {
+    $components_list['SID'] = array('form_key' => 'SID');
+  }
   foreach ($webform->webform['components'] as $cid => $component) {
     $component['cid'] = $cid;
-    $keys[trim($component[$field_key])] = $component;
+    $components_list[trim($component[$field_key])] = $component;
   }
 
   $data = array();
   $num = 0;
   $arraylen = 0;
-  $c = -1;
-
+  $count = -1;
 
   while (!feof($handle)) {
-    $c++;
+    $count++;
     $data = fgetcsv($handle, 0, $delimiter);
 
     // Ignore empty rows.
@@ -323,25 +325,25 @@ function _webform_import_import($form, $form_state, $file) {
       continue;
     }
 
-    if ($c == 0 ) { // This is the header row.
+    if ($count == 0 ) { // This is the header row.
       $arraylen = count($data);
-      foreach ($data as $k => &$v) {
-        $v = _webform_import_csvfieldtrim($v);
+      foreach ($data as $k => &$cell_value) {
+        $cell_value = _webform_import_csvfieldtrim($cell_value);
         // Identify the Key of Submitted Time
-        if($v == 'Submission DateTime' || $v == 'submitted_datetime'){
+        if ($cell_value == 'Submitted Time' || $cell_value == 'submitted_time'){
           $submitted_key = $k;
           continue;
         }
-        if (!$keys[$v] && $v) {
-          backdrop_set_message(t('Can not find column @k in components list, skipping.', array('@k' => $v)), 'warning');
+        if ($cell_value && !$components_list[$cell_value]) {
+          backdrop_set_message(t('Can not find column @k in components list, skipping.', array('@k' => $cell_value)), 'warning');
         }
-        elseif (isset($keys[$v]['cid'])) {
-          $cids[$k] = $keys[$v]['cid'];
+        elseif (isset($components_list[$cell_value]['cid'])) {
+          $cids[$k] = $components_list[$cell_value]['cid'];
         }
       }
       $fields = array_flip($data);
 
-      foreach ($keys as $k => $component) {
+      foreach ($components_list as $k => $component) {
         if (!strcmp($k, 'name')) {
           if ($component['required'] && !isset($fields[$k])) {
             form_set_error('upload', t('Column @k is required but could not be found in this file. Alter the file or the webform and try again.', array('@k' => $k)));
@@ -355,15 +357,18 @@ function _webform_import_import($form, $form_state, $file) {
 
     $num = count($data);
     $sid = NULL;
+    $submitted = REQUEST_TIME;
+
     if ($arraylen == $num) {
       $sub_array = array();
-      foreach ($data as $k => &$v) {
-
-        $v = _webform_import_csvfieldtrim($v);
-        if ($v == '') {
+      foreach ($data as $k => &$cell_value) {
+        $cell_value = _webform_import_csvfieldtrim($cell_value);
+        if ($cell_value == '') {
           // Checking mandatory field for a value.
-          if (array_key_exists('required',$keys[$fields[$k]]) && $keys[$fields[$k]]['required']) {
-            backdrop_set_message(t('Required field has no value at row,col: @r,@c.  Skipping this row!', array('@r' => $c, '@c' => $k)), 'warning');
+          $isset = isset($components_list[$fields[$k]]['required']);
+          if ($isset && $components_list[$fields[$k]]['required']) {
+            $message = 'Required field has no value at row,col: @row,@column. Skipping this row!';
+            backdrop_set_message(t($message, array('@row' => $count, '@column' => $k)), 'warning');
             continue 2;
           }
           else {
@@ -372,47 +377,54 @@ function _webform_import_import($form, $form_state, $file) {
         }
 
         // Checking SID input security.
-        if ($keys[$fields[$k]]['form_key'] === 'SID') {
-          if (!is_numeric($v)) {
-            backdrop_set_message(t('Invalid Submission ID at row,col: @r,@c.  Skipping this row!', array('@r' => $c, '@c' => $k)), 'warning');
+        if ($components_list[$fields[$k]]['form_key'] === 'SID') {
+          if (!is_numeric($cell_value)) {
+            backdrop_set_message(t('Invalid Submission ID at row,col: @row,@column.  Skipping this row!', array('@row' => $count, '@column' => $k)), 'warning');
             continue 2;
           }
           else {
-            $sid = intval($v); // Valid input security (integer values only).
+            $sid = intval($cell_value); // Valid input security (integer values only).
           }
         }
         // It's a real component, parse and add to $sub_array.
         elseif (($cid = isset($cids[$k]) ? $cids[$k]:FALSE) !== FALSE) {
-          $type = $keys[$fields[$k]]['type'];
+          $type = $components_list[$fields[$k]]['type'];
           // Date and time components.
           if ($type === 'date' || $type === 'time') {
             $timezone = date_default_timezone();
-            $date = new DateTime($v, new DateTimeZone($timezone));
+            $date = new DateTime($cell_value, new DateTimeZone($timezone));
             $timestamp = $date->format('U');
             if ($time = $timestamp) {
-              $v = $type === 'date' ? date('Y-m-d', $time) : date('H:i:s', $time);
+              $cell_value = $type === 'date' ? date('Y-m-d', $time) : date('H:i:s', $time);
             }
             else {
-              backdrop_set_message(t('Invalid datetime value at row,col: @r,@c. Skipping this row!', array('@r' => $c, '@c' => $k)), 'warning');
+              backdrop_set_message(t('Invalid datetime value at row,col: @row,@column. Skipping this row!', array('@row' => $count, '@column' => $k)), 'warning');
               continue 2;
             }
           }
           // Grid and multi-select components.
-          elseif ($type === 'grid' || ($type === 'select' && $keys[$fields[$k]]['extra']['multiple'] == 1)) {
+          elseif ($type === 'grid' || ($type === 'select' && $components_list[$fields[$k]]['extra']['multiple'] == 1)) {
             // Explode the value into an array and associate it back to the value.
-            $v = explode(',', $v);
+            $cell_value = explode(',', $cell_value);
           }
-          $sub_array[$cid] = $v;
+          $sub_array[$cid] = $cell_value;
         }
-        $submitted = ($k == $submitted_key) ? $v : time();
+
+        if ($k === $submitted_key) {
+          $submitted = strtotime($cell_value);
+        }
       }
 
+      global $user;
       $submission = (object) array(
         'nid' => $webform->nid,
         'uid' => $user->uid,
         'submitted' => $submitted,
-        'remote_addr' => ip_address(),
-        'is_draft' => 0,
+        'completed' => 0,
+        'modified' => REQUEST_TIME,
+        'remote_addr' => webform_ip_address($node),
+        'is_draft' => FALSE,
+        'serial' => NULL,
         'data' => webform_submission_data($webform, $sub_array),
       );
 
@@ -425,13 +437,13 @@ function _webform_import_import($form, $form_state, $file) {
         $sids[] = webform_submission_insert($webform, $submission);
       }
     }
-    else{
-      backdrop_set_message(t('Row @c is malformed and will need to be fixed and resubmitted.', array('@c' => ($c+1))), 'warning');
+    else {
+      backdrop_set_message(t('Row @column is malformed and will need to be fixed and resubmitted.', array('@column' => ($count+1))), 'warning');
     }
   }
   fclose($handle);
 
-  if (!file_delete($file)) {
+  if (!file_delete($file->fid)) {
     watchdog('webform-import', 'File could not be deleted (cleanup process). File: %file at path %path . !details', array('%file' => $file->filename, '%path' => $file->destination, '!results' => '<br />\n<pre>' . htmlentities(print_r($form_state['values'], TRUE)) . '</pre>'), WATCHDOG_ERROR);
   }
 
