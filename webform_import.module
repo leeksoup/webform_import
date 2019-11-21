@@ -63,6 +63,14 @@ function webform_import_csvtemplate($node, $type) {
     'name' => 'Submission ID',
     'form_key' => 'SID',
   );
+  $node->webform['components']['-2'] = array(
+    'name' => 'UID',
+    'form_key' => 'UID',
+  );
+  $node->webform['components']['-3'] = array(
+    'name' => 'IP Address',
+    'form_key' => 'IP_ADDRESS',
+  );
   if (array_key_exists($type, $types)) {
 
     foreach ($node->webform['components'] as $cid => $component) {
@@ -132,6 +140,8 @@ function webform_import_form($node, $form_state) {
   );
   $component_table['rows'] = array();
   $component_table['rows'][] = array('Submission ID', 'SID');
+  $component_table['rows'][] = array('UID', 'UID');
+  $component_table['rows'][] = array('IP Address', 'IP_ADDRESS');
   foreach ($node->webform['components'] as $cid => $component) {
     if ($component['type'] == 'file' || $component['type'] == 'fieldset'|| $component['type'] == 'markup' || $component['type'] == 'pagebreak') {
       continue;
@@ -173,6 +183,8 @@ function webform_import_form($node, $form_state) {
     'items' => array(
       'All rows with a submission id (SID) will be updated. Those without a submission id will be inserted.',
       'All rows without submitted time will be inserted with current system time.',
+      'All rows without a submitted IP Address will use the IP Address of the person performing the import.',
+      'All rows without a submitted user id (UID) will use the user id of the person performing the import.',
       array(
         'data' => 'Component specific help:',
         'children' => array(
@@ -299,13 +311,19 @@ function _webform_import_import($form, $form_state, $file) {
   $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
-  $components_list = array();
+  $components_list = array(
+    'UID' => array('form_key' => 'webform_uid'),
+  );
+
   if ($field_key === 'name') {
-    $components_list['Submission ID'] = array('form_key' => 'SID');
+    $components_list['Submission ID'] = array('form_key' => 'webform_sid');
+    $components_list['IP Address'] = array('form_key' => 'webform_ip_address');
   }
   else {
-    $components_list['SID'] = array('form_key' => 'SID');
+    $components_list['SID'] = array('form_key' => 'webform_sid');
+    $components_list['IP_ADDRESS'] = array('form_key' => 'webform_ip_address');
   }
+
   foreach ($webform->webform['components'] as $cid => $component) {
     $component['cid'] = $cid;
     $components_list[trim($component[$field_key])] = $component;
@@ -355,9 +373,12 @@ function _webform_import_import($form, $form_state, $file) {
       continue 1;
     }
 
-    $num = count($data);
-    $sid = NULL;
+    global $user;
+    $uid = $user->uid;
+    $ipaddress = webform_ip_address($node);
     $submitted = REQUEST_TIME;
+    $sid = NULL;
+    $num = count($data);
 
     if ($arraylen == $num) {
       $sub_array = array();
@@ -410,19 +431,24 @@ function _webform_import_import($form, $form_state, $file) {
           $sub_array[$cid] = $cell_value;
         }
 
+        if ($components_list[$fields[$k]]['form_key'] === 'UID') {
+          $uid = $v;
+        }
+        if ($components_list[$fields[$k]]['form_key'] === 'IP_ADDRESS') {
+          $ipaddress = $v;
+        }
         if ($k === $submitted_key) {
           $submitted = strtotime($cell_value);
         }
       }
 
-      global $user;
       $submission = (object) array(
         'nid' => $webform->nid,
-        'uid' => $user->uid,
+        'uid' => $uid,
         'submitted' => $submitted,
         'completed' => 0,
         'modified' => REQUEST_TIME,
-        'remote_addr' => webform_ip_address($node),
+        'remote_addr' => $ipaddress,
         'is_draft' => FALSE,
         'serial' => NULL,
         'data' => webform_submission_data($webform, $sub_array),
