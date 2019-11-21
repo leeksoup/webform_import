@@ -1,0 +1,19 @@
+/**
+ * CSS for webform import table.
+ */
+ .webform-import-instructions .item-list {
+  margin-bottom: 2em;
+}
+.webform-import-instructions table th {
+  line-height: 45px;
+}
+.webform-import-instructions table .move-right {
+  float: right;
+}
+.webform-import-instructions table a.button {
+  border: 1px solid #000;
+  margin-bottom: 0;
+}
+.webform-import-instructions p.asterisk {
+  text-align: right;
+}
