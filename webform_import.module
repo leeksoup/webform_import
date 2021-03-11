@@ -431,11 +431,11 @@ function _webform_import_import($form, $form_state, $file) {
           $sub_array[$cid] = $cell_value;
         }
 
-        if ($components_list[$fields[$k]]['form_key'] === 'UID') {
-          $uid = $v;
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_uid') {
+          $uid = $cell_value;
         }
-        if ($components_list[$fields[$k]]['form_key'] === 'IP_ADDRESS') {
-          $ipaddress = $v;
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_ip_address') {
+          $ipaddress = $cell_value;
         }
         if ($k === $submitted_key) {
           $submitted = strtotime($cell_value);
