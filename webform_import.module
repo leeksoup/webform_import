@@ -80,7 +80,7 @@ function webform_import_csvtemplate($node, $type) {
       }
     }
     // @TODO Make this line more generic.
-    $headers[] = ($type=='name') ? 'Submitted Time' : 'submitted_time';
+    $headers[] = ($type=='name') ? 'Submitted Time' : 'webform_time';
     $csv = join(',', $headers);
 
     backdrop_add_http_header('Content-Type', 'application/force-download');
@@ -158,7 +158,7 @@ function webform_import_form($node, $form_state) {
   // Add Submission Date - will be used if present in the file
   $component_table['rows'][] = array(
     array('data' => 'Submitted Time', 'style' => $style ),
-    array('data' => 'submitted_time', 'style' => $style ),
+    array('data' => 'webform_time', 'style' => $style ),
   );
 
   $form['header'] = array(
@@ -311,17 +311,28 @@ function _webform_import_import($form, $form_state, $file) {
   $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
-  $components_list = array(
-    'UID' => array('form_key' => 'webform_uid'),
-  );
-
-  if ($field_key === 'name') {
-    $components_list['Submission ID'] = array('form_key' => 'webform_sid');
-    $components_list['IP Address'] = array('form_key' => 'webform_ip_address');
-  }
-  else {
+  // Main portion of fix for #4
+  if ($field_key === 'name') { // using Field Names
+    $components_list['Serial'] = array('form_key' => 'webform_serial');
     $components_list['SID'] = array('form_key' => 'webform_sid');
-    $components_list['IP_ADDRESS'] = array('form_key' => 'webform_ip_address');
+    $components_list['Submitted Time'] = array('form_key' => 'webform_time');
+    $components_list['Completed Time'] = array('form_key' => 'webform_completed_time');
+    $components_list['Modified Time'] = array('form_key' => 'webform_modified_time');
+    $components_list['Draft'] = array('form_key' => 'webform_draft');
+    $components_list['IP Address'] = array('form_key' => 'webform_ip_address');
+    $components_list['UID'] = array('form_key' => 'webform_uid');
+    $components_list['Username'] = array('form_key' => 'webform_username');
+  }
+  else { // using Field Form Keys 
+    $components_list['webform_serial'] = array('form_key' => 'webform_serial');
+    $components_list['webform_sid'] = array('form_key' => 'webform_sid');
+    $components_list['webform_time'] = array('form_key' => 'webform_time');
+    $components_list['webform_completed_time'] = array('form_key' => 'webform_completed_time');
+    $components_list['webform_modified_time'] = array('form_key' => 'webform_modified_time');
+    $components_list['webform_draft'] = array('form_key' => 'webform_draft');
+    $components_list['webform_ip_address'] = array('form_key' => 'webform_ip_address');
+    $components_list['webform_uid'] = array('form_key' => 'webform_uid');
+    $components_list['webform_username'] = array('form_key' => 'webform_username');
   }
 
   foreach ($webform->webform['components'] as $cid => $component) {
@@ -347,11 +358,6 @@ function _webform_import_import($form, $form_state, $file) {
       $arraylen = count($data);
       foreach ($data as $k => &$cell_value) {
         $cell_value = _webform_import_csvfieldtrim($cell_value);
-        // Identify the Key of Submitted Time
-        if ($cell_value == 'Submitted Time' || $cell_value == 'submitted_time'){
-          $submitted_key = $k;
-          continue;
-        }
         if ($cell_value && !$components_list[$cell_value]) {
           backdrop_set_message(t('Can not find column @k in components list, skipping.', array('@k' => $cell_value)), 'warning');
         }
@@ -373,9 +379,10 @@ function _webform_import_import($form, $form_state, $file) {
       continue 1;
     }
 
+    // Set defaults
     global $user;
     $uid = $user->uid;
-    $ipaddress = webform_ip_address($node);
+    $ipaddress = webform_ip_address($webform);	// Fixes issue #5
     $submitted = REQUEST_TIME;
     $sid = NULL;
     $num = count($data);
@@ -398,7 +405,7 @@ function _webform_import_import($form, $form_state, $file) {
         }
 
         // Checking SID input security.
-        if ($components_list[$fields[$k]]['form_key'] === 'SID') {
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_sid') {
           if (!is_numeric($cell_value)) {
             backdrop_set_message(t('Invalid Submission ID at row,col: @row,@column.  Skipping this row!', array('@row' => $count, '@column' => $k)), 'warning');
             continue 2;
@@ -429,6 +436,7 @@ function _webform_import_import($form, $form_state, $file) {
             $cell_value = explode(',', $cell_value);
           }
           $sub_array[$cid] = $cell_value;
+          backdrop_set_message(t('Debug: sub_array value @sub_k / @sub_v', array('@sub_k' => implode(',',array_keys($sub_array)), '@sub_v' => implode(',',array_values($sub_array)))), 'warning');
         }
 
         if ($components_list[$fields[$k]]['form_key'] === 'webform_uid') {
@@ -437,8 +445,9 @@ function _webform_import_import($form, $form_state, $file) {
         if ($components_list[$fields[$k]]['form_key'] === 'webform_ip_address') {
           $ipaddress = $cell_value;
         }
-        if ($k === $submitted_key) {
-          $submitted = strtotime($cell_value);
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_time') {
+          // Modify saved date string format for strtotime to parse it
+          $submitted = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
       }
 
