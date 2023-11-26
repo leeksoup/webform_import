@@ -291,8 +291,8 @@ function webform_import_form_submit($form, $form_state) {
  */
 function _webform_import_import($form, $form_state, $file) {
 
-  // This makes php auto-detect mac line endings.
-  ini_set('auto_detect_line_endings', TRUE);
+  // This makes php auto-detect legacy mac line endings. Deprecated in php 8.1.
+  // ini_set('auto_detect_line_endings', TRUE);
 
   if (($handle = fopen($file->destination, 'r')) === FALSE) {
     form_set_error('upload', t('File could not be opened for reading.'));
@@ -323,7 +323,7 @@ function _webform_import_import($form, $form_state, $file) {
     $components_list['UID'] = array('form_key' => 'webform_uid');
     $components_list['Username'] = array('form_key' => 'webform_username');
   }
-  else { // using Field Form Keys 
+  else { // using Field Form Keys
     $components_list['webform_serial'] = array('form_key' => 'webform_serial');
     $components_list['webform_sid'] = array('form_key' => 'webform_sid');
     $components_list['webform_time'] = array('form_key' => 'webform_time');
@@ -384,10 +384,14 @@ function _webform_import_import($form, $form_state, $file) {
     $uid = $user->uid;
     $ipaddress = webform_ip_address($webform);	// Fixes issue #5
     $submitted = REQUEST_TIME;
+    $completed = REQUEST_TIME;
+    $modified = REQUEST_TIME;
     $sid = NULL;
+    $serial = NULL;  // TODO: Should be auto-incremented if not present, otherwise will cause DB error
     $num = count($data);
 
     if ($arraylen == $num) {
+      // clear sub_array for new row / data record
       $sub_array = array();
       foreach ($data as $k => &$cell_value) {
         $cell_value = _webform_import_csvfieldtrim($cell_value);
@@ -414,6 +418,10 @@ function _webform_import_import($form, $form_state, $file) {
             $sid = intval($cell_value); // Valid input security (integer values only).
           }
         }
+        // serial number for submission
+        elseif ($components_list[$fields[$k]]['form_key'] === 'webform_serial') {
+          $serial = intval($cell_value); // sanitize input to integer value only
+        }
         // It's a real component, parse and add to $sub_array.
         elseif (($cid = isset($cids[$k]) ? $cids[$k]:FALSE) !== FALSE) {
           $type = $components_list[$fields[$k]]['type'];
@@ -436,7 +444,6 @@ function _webform_import_import($form, $form_state, $file) {
             $cell_value = explode(',', $cell_value);
           }
           $sub_array[$cid] = $cell_value;
-          backdrop_set_message(t('Debug: sub_array value @sub_k / @sub_v', array('@sub_k' => implode(',',array_keys($sub_array)), '@sub_v' => implode(',',array_values($sub_array)))), 'warning');
         }
 
         if ($components_list[$fields[$k]]['form_key'] === 'webform_uid') {
@@ -445,9 +452,17 @@ function _webform_import_import($form, $form_state, $file) {
         if ($components_list[$fields[$k]]['form_key'] === 'webform_ip_address') {
           $ipaddress = $cell_value;
         }
+        // Timestamps for webform
         if ($components_list[$fields[$k]]['form_key'] === 'webform_time') {
           // Modify saved date string format for strtotime to parse it
           $submitted = strtotime(preg_replace('/ - /', ' ', $cell_value));
+        }
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_completed_time') {
+          $completed = strtotime(preg_replace('/ - /', ' ', $cell_value));
+        }
+        // Allows exact import. The next 4 lines can be removed if it is preferred to update to REQUEST_TIME
+        if ($components_list[$fields[$k]]['form_key'] === 'webform_modified_time') {
+          $modified = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
       }
 
@@ -455,11 +470,11 @@ function _webform_import_import($form, $form_state, $file) {
         'nid' => $webform->nid,
         'uid' => $uid,
         'submitted' => $submitted,
-        'completed' => 0,
-        'modified' => REQUEST_TIME,
+        'completed' => $completed,
+        'modified' => $modified,
         'remote_addr' => $ipaddress,
         'is_draft' => FALSE,
-        'serial' => NULL,
+        'serial' => $serial,
         'data' => webform_submission_data($webform, $sub_array),
       );
 
