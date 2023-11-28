@@ -138,11 +138,22 @@ function webform_import_form($node, $form_state) {
     array('data' => t('Field Names') . '&nbsp;<div class="move-right"> ' . $name_button . ' </div>'),
     array('data' => t('Field Form Keys') . '&nbsp;<div class="move-right"> ' . $key_button . ' </div>'),
   );
+
+  // Standard webform components
   $component_table['rows'] = array();
-  $component_table['rows'][] = array('Submission ID', 'SID');
-  $component_table['rows'][] = array('UID', 'UID');
-  $component_table['rows'][] = array('IP Address', 'IP_ADDRESS');
+  $component_table['rows'][] = array('Serial', 'webform_serial');
+  $component_table['rows'][] = array('SID', 'webform_sid');
+  $component_table['rows'][] = array('Submitted Time', 'webform_time');
+  $component_table['rows'][] = array('Completed Time', 'webform_completed_time');
+  $component_table['rows'][] = array('Modified Time', 'webform_modified_time');
+  $component_table['rows'][] = array('Draft', 'webform_draft');
+  $component_table['rows'][] = array('IP Address', 'webform_ip_address');
+  $component_table['rows'][] = array('UID', 'webform_uid');
+  $component_table['rows'][] = array('Username', 'webform_username');
+
+  // Form components for the specific webform
   foreach ($node->webform['components'] as $cid => $component) {
+    // skip non-data components
     if ($component['type'] == 'file' || $component['type'] == 'fieldset'|| $component['type'] == 'markup' || $component['type'] == 'pagebreak') {
       continue;
     }
@@ -155,11 +166,6 @@ function webform_import_form($node, $form_state) {
       array('data' => $component['form_key'], 'style' => $style ),
     );
   }
-  // Add Submission Date - will be used if present in the file
-  $component_table['rows'][] = array(
-    array('data' => 'Submitted Time', 'style' => $style ),
-    array('data' => 'webform_time', 'style' => $style ),
-  );
 
   $form['header'] = array(
     '#type' => 'item',
@@ -196,7 +202,8 @@ function webform_import_form($node, $form_state) {
         ),
       ),
       'Only data entry fields are importable. Excluded component types include: fieldset, markup &amp; pagebreak.',
-      'The file must use the following values for column headers, anything else will be ignored. &nbsp;<small>* bold names are mandatory and must contain a value</small>',
+      'Rows may contain a modified time (e.g. from a webform export) but it will be ignored and replaced with current system time if that row is updated in the DB.',
+      'The file must use the following values for column headers, anything else will be ignored. &nbsp;<small>* bold names are mandatory and must contain a value. Other fields will be imported if present.</small>',
     ),
   );
 
@@ -323,16 +330,10 @@ function _webform_import_import($form, $form_state, $file) {
     $components_list['UID'] = array('form_key' => 'webform_uid');
     $components_list['Username'] = array('form_key' => 'webform_username');
   }
-  else { // using Field Form Keys
-    $components_list['webform_serial'] = array('form_key' => 'webform_serial');
-    $components_list['webform_sid'] = array('form_key' => 'webform_sid');
-    $components_list['webform_time'] = array('form_key' => 'webform_time');
-    $components_list['webform_completed_time'] = array('form_key' => 'webform_completed_time');
-    $components_list['webform_modified_time'] = array('form_key' => 'webform_modified_time');
-    $components_list['webform_draft'] = array('form_key' => 'webform_draft');
-    $components_list['webform_ip_address'] = array('form_key' => 'webform_ip_address');
-    $components_list['webform_uid'] = array('form_key' => 'webform_uid');
-    $components_list['webform_username'] = array('form_key' => 'webform_username');
+  else { // using Field Form Keys - in this case form_key has the same value as the keys in the componenents_list array
+    foreach (array('webform_serial','webform_sid','webform_time','webform_completed_time','webform_modified_time','webform_draft','webform_ip_address','webform_uid','webform_username') as $key) {
+      $components_list[$key] = array('form_key' => $key);
+    }
   }
 
   foreach ($webform->webform['components'] as $cid => $component) {
@@ -387,7 +388,7 @@ function _webform_import_import($form, $form_state, $file) {
     $completed = REQUEST_TIME;
     $modified = REQUEST_TIME;
     $sid = NULL;
-    $serial = NULL;  // TODO: Should be auto-incremented if not present, otherwise will cause DB error
+    $serial = NULL;  // Default NULL to identify rows with missing serial numbers
     $num = count($data);
 
     if ($arraylen == $num) {
@@ -460,7 +461,7 @@ function _webform_import_import($form, $form_state, $file) {
         if ($components_list[$fields[$k]]['form_key'] === 'webform_completed_time') {
           $completed = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
-        // Allows exact import. The next 4 lines can be removed if it is preferred to update to REQUEST_TIME
+        // The next 3 lines can probably be removed because webform_submission_insert will update the modified time to current
         if ($components_list[$fields[$k]]['form_key'] === 'webform_modified_time') {
           $modified = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
@@ -474,7 +475,8 @@ function _webform_import_import($form, $form_state, $file) {
         'modified' => $modified,
         'remote_addr' => $ipaddress,
         'is_draft' => FALSE,
-        'serial' => $serial,
+	// use the row counter as the serial number if it's missing (NULL); needs to be unique or will cause DB error
+        'serial' => $serial ?? $count, 
         'data' => webform_submission_data($webform, $sub_array),
       );
 
@@ -488,7 +490,7 @@ function _webform_import_import($form, $form_state, $file) {
       }
     }
     else {
-      backdrop_set_message(t('Row @column is malformed and will need to be fixed and resubmitted.', array('@column' => ($count+1))), 'warning');
+      backdrop_set_message(t('Row @row is malformed and will need to be fixed and resubmitted.', array('@row' => ($count+1))), 'warning');
     }
   }
   fclose($handle);
