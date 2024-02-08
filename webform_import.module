@@ -383,7 +383,7 @@ function _webform_import_import($form, $form_state, $file) {
     // Set defaults
     global $user;
     $uid = $user->uid;
-    $ipaddress = webform_ip_address($webform);	// Fixes issue #5
+    $ipaddress = webform_ip_address($node);
     $submitted = REQUEST_TIME;
     $completed = REQUEST_TIME;
     $modified = REQUEST_TIME;
