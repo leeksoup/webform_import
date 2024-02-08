@@ -318,7 +318,6 @@ function _webform_import_import($form, $form_state, $file) {
   $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
-  // Main portion of fix for #4
   if ($field_key === 'name') { // using Field Names
     $components_list['Serial'] = array('form_key' => 'webform_serial');
     $components_list['SID'] = array('form_key' => 'webform_sid');
