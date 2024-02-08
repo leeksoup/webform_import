@@ -375,7 +375,7 @@ function _webform_import_import($form, $form_state, $file) {
 
     global $user;
     $uid = $user->uid;
-    $ipaddress = webform_ip_address($node);
+    $ipaddress = webform_ip_address($webform);  // Fixes issue #5
     $submitted = REQUEST_TIME;
     $sid = NULL;
     $num = count($data);
