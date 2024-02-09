@@ -139,7 +139,7 @@ function webform_import_form($node, $form_state) {
     array('data' => t('Field Form Keys') . '&nbsp;<div class="move-right"> ' . $key_button . ' </div>'),
   );
 
-  // Standard webform components
+  // This is the set of standard webform components.
   $component_table['rows'] = array();
   $component_table['rows'][] = array('Serial', 'webform_serial');
   $component_table['rows'][] = array('SID', 'webform_sid');
@@ -151,9 +151,9 @@ function webform_import_form($node, $form_state) {
   $component_table['rows'][] = array('UID', 'webform_uid');
   $component_table['rows'][] = array('Username', 'webform_username');
 
-  // Form components for the specific webform
+  // The below are addtitional form components for the specific webform.
   foreach ($node->webform['components'] as $cid => $component) {
-    // skip non-data components
+    // Skip non-data components.
     if ($component['type'] == 'file' || $component['type'] == 'fieldset'|| $component['type'] == 'markup' || $component['type'] == 'pagebreak') {
       continue;
     }
@@ -318,8 +318,8 @@ function _webform_import_import($form, $form_state, $file) {
   $delimiter = $delimiter == "\t" ? "\t" : $delimiter;
   $field_key = $form_state['values']['field_keys'];
 
-  // Main portion of fix for #4
-  if ($field_key === 'name') { // using Field Names
+  // When importing using Field Names, set up the form keys for each field name.
+  if ($field_key === 'name') { 
     $components_list['Serial'] = array('form_key' => 'webform_serial');
     $components_list['SID'] = array('form_key' => 'webform_sid');
     $components_list['Submitted Time'] = array('form_key' => 'webform_time');
@@ -330,7 +330,8 @@ function _webform_import_import($form, $form_state, $file) {
     $components_list['UID'] = array('form_key' => 'webform_uid');
     $components_list['Username'] = array('form_key' => 'webform_username');
   }
-  else { // using Field Form Keys - in this case form_key has the same value as the keys in the componenents_list array
+  else {
+  // When using Field Form Keys, the form_key has the same value as the keys in the componenents_list array.
     foreach (array('webform_serial','webform_sid','webform_time','webform_completed_time','webform_modified_time','webform_draft','webform_ip_address','webform_uid','webform_username') as $key) {
       $components_list[$key] = array('form_key' => $key);
     }
@@ -380,24 +381,24 @@ function _webform_import_import($form, $form_state, $file) {
       continue 1;
     }
 
-    // Set defaults
+    // Set defaults for form data in case it's missing in the current row.
     global $user;
     $uid = $user->uid;
-    $ipaddress = webform_ip_address($webform);  // Fixes issue #5
+    $ipaddress = webform_ip_address($webform);
     $submitted = REQUEST_TIME;
     $completed = REQUEST_TIME;
     $modified = REQUEST_TIME;
     $sid = NULL;
-    $serial = NULL;  // Default NULL to identify rows with missing serial numbers
+    $serial = NULL;  // Default NULL to identify rows with missing serial numbers.
     $num = count($data);
 
     if ($arraylen == $num) {
-      // clear sub_array for new row / data record
+      // Clear the sub_array for new row (submission data record).
       $sub_array = array();
       foreach ($data as $k => &$cell_value) {
         $cell_value = _webform_import_csvfieldtrim($cell_value);
         if ($cell_value == '') {
-          // Checking mandatory field for a value.
+          // Check that each mandatory field has a value.
           $isset = isset($components_list[$fields[$k]]['required']);
           if ($isset && $components_list[$fields[$k]]['required']) {
             $message = 'Required field has no value at row,col: @row,@column. Skipping this row!';
@@ -405,28 +406,28 @@ function _webform_import_import($form, $form_state, $file) {
             continue 2;
           }
           else {
-            continue 1;  // Skip field if empty.
+            continue 1;  // Skip the field if empty.
           }
         }
 
-        // Checking SID input security.
+        // Check SID value for input security.
         if ($components_list[$fields[$k]]['form_key'] === 'webform_sid') {
           if (!is_numeric($cell_value)) {
             backdrop_set_message(t('Invalid Submission ID at row,col: @row,@column.  Skipping this row!', array('@row' => $count, '@column' => $k)), 'warning');
             continue 2;
           }
           else {
-            $sid = intval($cell_value); // Valid input security (integer values only).
+            $sid = intval($cell_value); // Sanitize to integer value only.
           }
         }
-        // serial number for submission
+        // Get the serial number for the webform submission.
         elseif ($components_list[$fields[$k]]['form_key'] === 'webform_serial') {
-          $serial = intval($cell_value); // sanitize input to integer value only
+          $serial = intval($cell_value); // Sanitize to integer value only.
         }
-        // It's a real component, parse and add to $sub_array.
+        // It's a real component, so parse and add to $sub_array.
         elseif (($cid = isset($cids[$k]) ? $cids[$k]:FALSE) !== FALSE) {
           $type = $components_list[$fields[$k]]['type'];
-          // Date and time components.
+          // Handle date and time components.
           if ($type === 'date' || $type === 'time') {
             $timezone = date_default_timezone();
             $date = new DateTime($cell_value, new DateTimeZone($timezone));
@@ -439,9 +440,9 @@ function _webform_import_import($form, $form_state, $file) {
               continue 2;
             }
           }
-          // Grid and multi-select components.
+          // Handle grid and multi-select components.
           elseif ($type === 'grid' || ($type === 'select' && $components_list[$fields[$k]]['extra']['multiple'] == 1)) {
-            // Explode the value into an array and associate it back to the value.
+            // Explode the value into an array and save it back to the value.
             $cell_value = explode(',', $cell_value);
           }
           $sub_array[$cid] = $cell_value;
@@ -453,15 +454,15 @@ function _webform_import_import($form, $form_state, $file) {
         if ($components_list[$fields[$k]]['form_key'] === 'webform_ip_address') {
           $ipaddress = $cell_value;
         }
-        // Timestamps for webform
+        // Read the timestamps for the webform submission.
         if ($components_list[$fields[$k]]['form_key'] === 'webform_time') {
-          // Modify saved date string format for strtotime to parse it
+          // Modify saved date string format so that strtotime can parse it.
           $submitted = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
         if ($components_list[$fields[$k]]['form_key'] === 'webform_completed_time') {
           $completed = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
-        // The next 3 lines can probably be removed because webform_submission_insert will update the modified time to current
+        // @todo The next 3 lines can probably be removed because webform_submission_insert will update the modified time to current.
         if ($components_list[$fields[$k]]['form_key'] === 'webform_modified_time') {
           $modified = strtotime(preg_replace('/ - /', ' ', $cell_value));
         }
@@ -475,12 +476,13 @@ function _webform_import_import($form, $form_state, $file) {
         'modified' => $modified,
         'remote_addr' => $ipaddress,
         'is_draft' => FALSE,
-	// use the row counter as the serial number if it's missing (NULL); needs to be unique or will cause DB error
+	// Use the row counter as the serial number if it's missing (NULL). 
+	// It needs to be unique or it will cause a DB error.
         'serial' => $serial ?? $count, 
         'data' => webform_submission_data($webform, $sub_array),
       );
 
-      // Determine if INSERT or UPDATE based on inclusion of SID.
+      // Determine whether to INSERT or UPDATE based on inclusion of SID.
       if ($sid != NULL) {
         $submission->sid = $sid;
         $sids[] = webform_submission_update($webform, $submission);
