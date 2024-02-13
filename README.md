@@ -34,6 +34,7 @@ Current Maintainers
 -------------------
 
 - [Jen Lampton](https://github.com/jenlampton).
+- [leeksoup](https://github.com/leeksoup).
 - Seeking aditional maintainers.
 
 Credits
