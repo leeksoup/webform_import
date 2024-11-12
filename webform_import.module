@@ -361,7 +361,10 @@ function _webform_import_import($form, $form_state, $file) {
       foreach ($data as $k => &$cell_value) {
         $cell_value = _webform_import_csvfieldtrim($cell_value);
         if ($cell_value && !$components_list[$cell_value]) {
-          backdrop_set_message(t('Can not find column @k in components list, skipping.', array('@k' => $cell_value)), 'warning');
+          // Go to the next row and reset the counter because this isn't the real webform table header.
+          backdrop_set_message(t('Can not find column @k in components list, skipping row.', array('@k' => $cell_value)), 'warning');
+          $count--;
+          continue;
         }
         elseif (isset($components_list[$cell_value]['cid'])) {
           $cids[$k] = $components_list[$cell_value]['cid'];
