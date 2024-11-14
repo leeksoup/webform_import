@@ -319,7 +319,7 @@ function _webform_import_import($form, $form_state, $file) {
   $field_key = $form_state['values']['field_keys'];
 
   // When importing using Field Names, set up the form keys for each field name.
-  if ($field_key === 'name') { 
+  if ($field_key === 'name') {
     $components_list['Serial'] = array('form_key' => 'webform_serial');
     $components_list['SID'] = array('form_key' => 'webform_sid');
     $components_list['Submitted Time'] = array('form_key' => 'webform_time');
@@ -479,19 +479,31 @@ function _webform_import_import($form, $form_state, $file) {
         'modified' => $modified,
         'remote_addr' => $ipaddress,
         'is_draft' => FALSE,
-	// Use the row counter as the serial number if it's missing (NULL). 
-	// It needs to be unique or it will cause a DB error.
-        'serial' => $serial ?? $count, 
+        // Use the row counter as the serial number if it's missing (NULL).
+        // It needs to be unique or it will cause a DB error.
+        'serial' => $serial ?? $count,
         'data' => webform_submission_data($webform, $sub_array),
       );
 
-      // Determine whether to INSERT or UPDATE based on inclusion of SID.
+      // If there is no SID, assume it is a new record and insert it.
       if ($sid != NULL) {
         $submission->sid = $sid;
-        $sids[] = webform_submission_update($webform, $submission);
+        // Check whether this record is in the DB already and update if yes or insert if no.
+        $result = db_query("SELECT sid FROM {webform_submissions} WHERE sid = $sid AND nid = $submission->nid");
+        if ($result->rowCount()) {
+          backdrop_set_message(t('Updating submission with SID @sid', array('@sid'=>$sid)), 'information');
+          $sids[] = webform_submission_update($webform, $submission);
+        }
+        else {
+          backdrop_set_message(t('Creating new submission with SID @sid', array('@sid'=>$sid)), 'information');
+          // webform_submission_insert does not write to the webform_submissions table if SID is set, so we do it ourselves.
+          backdrop_write_record('webform_submissions', $submission);
+          $sids[] = webform_submission_insert($webform, $submission);
+        }
       }
       else {
         $sids[] = webform_submission_insert($webform, $submission);
+        backdrop_set_message(t('Creating new submission'), 'information');
       }
     }
     else {
